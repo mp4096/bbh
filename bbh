@@ -1,0 +1,117 @@
+#!/usr/bin/env python
+
+import argparse
+import codecs
+import os
+import re
+import requests
+import subprocess
+import sys
+
+
+BBH_USAGE = """\
+bbh <command> [<args>]
+
+Commands:
+    fetch    Fetch bibtex entries
+    open     Open DOIs in browser
+"""
+
+
+def doi_to_bib(doi):
+    doi = doi.strip()
+    url = "http://dx.doi.org/" + doi
+    headers = {"accept": "application/x-bibtex"}
+    r = requests.get(url, headers=headers)
+    if r.status_code == 404:
+        raise RuntimeError("Could not find DOI " + doi)
+    if not r.headers["Content-Type"] == headers["accept"]:
+        raise RuntimeError("Could not find DOI " + doi)
+    return r.text
+
+
+def dump_to_file(filename, data):
+    if data:
+        with codecs.open(filename, "w", encoding="utf8") as f:
+            f.write("\n".join(data))
+            f.write("\n")
+
+
+def get_doi_batch(filename_in, filename_out, filename_failed):
+    with codecs.open(filename_in, "r", encoding="utf8") as f:
+        # Parse the file into a list of strings, skip empty lines
+        dois = [l.strip() for l in f if l.strip()]
+
+    succeeded = []
+    failed = []
+
+    for d in dois:
+        print("Retrieving {:s} ... ".format(d), end="")
+        try:
+            record = doi_to_bib(d)
+        except RuntimeError:
+            print("NOK")
+            failed.append(d)
+        else:
+            print("OK")
+            succeeded.append(record)
+
+    dump_to_file(filename_out, succeeded)
+    dump_to_file(filename_failed, failed)
+
+
+class Bbh():
+    def __init__(self):
+        parser = argparse.ArgumentParser(
+            description="Bibliography helper",
+            usage=BBH_USAGE,
+            )
+        parser.add_argument("command", help="Subcommand to run")
+        args = parser.parse_args(sys.argv[1:2])
+        if not hasattr(self, args.command):
+            print("Unrecognized command")
+            parser.print_help()
+            exit(1)
+        getattr(self, args.command)()
+
+    def fetch(self):
+        parser = argparse.ArgumentParser(description="Fetch bibtex entries")
+        parser.add_argument(
+            "in",
+            help="Input file with a list of DOIs",
+            )
+        parser.add_argument(
+            "-F",
+            "--failed",
+            default="failed.txt",
+            help="Target file for failed DOIs",
+            )
+        parser.add_argument(
+            "-o",
+            "--out",
+            default="results.bib",
+            help="Target file for successfully fetched DOIs",
+            )
+        args = parser.parse_args(sys.argv[2:])
+        get_doi_batch(getattr(args, "in", None), args.out, args.failed)
+
+    def open(self):
+        parser = argparse.ArgumentParser(description="Open DOIs in browser")
+        parser.add_argument(
+            "in",
+            help="Input file with a list of DOIs",
+            )
+        parser.add_argument(
+            "-b",
+            "--browser",
+            default="firefox",
+            help="Browser to use",
+            )
+        args = parser.parse_args(sys.argv[2:])
+        with codecs.open(getattr(args, "in", None), "r", encoding="utf8") as f:
+            urls = ["https://dx.doi.org/" + d for d in f if d.strip()]
+        subprocess.Popen([args.browser] + urls)
+
+
+if __name__ == "__main__":
+    Bbh()
