@@ -1,7 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import argparse
-import codecs
 import os
 import re
 import requests
@@ -32,13 +31,13 @@ def doi_to_bib(doi):
 
 def dump_to_file(filename, data):
     if data:
-        with codecs.open(filename, "w", encoding="utf8") as f:
+        with open(filename, "w", encoding="utf8") as f:
             f.write("\n".join(data))
             f.write("\n")
 
 
 def get_doi_batch(filename_in, filename_out, filename_failed):
-    with codecs.open(filename_in, "r", encoding="utf8") as f:
+    with open(filename_in, "r", encoding="utf8") as f:
         # Parse the file into a list of strings, skip empty lines
         dois = [l.strip() for l in f if l.strip()]
 
@@ -108,7 +107,7 @@ class Bbh():
             help="Browser to use",
             )
         args = parser.parse_args(sys.argv[2:])
-        with codecs.open(getattr(args, "in", None), "r", encoding="utf8") as f:
+        with open(getattr(args, "in", None), "r", encoding="utf8") as f:
             urls = ["https://dx.doi.org/" + d for d in f if d.strip()]
         subprocess.Popen([args.browser] + urls)
 
